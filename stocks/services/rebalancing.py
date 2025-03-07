@@ -2,7 +2,9 @@ from datetime import datetime, timedelta
 import pandas as pd
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from models import daily_ticker  # DB 모델
+
+from stocks.core.database import SessionLocal
+from stocks.models.daily_ticker import DailyTicker
 
 
 def fetch_price_data(session: Session, start_date: datetime):
@@ -10,7 +12,7 @@ def fetch_price_data(session: Session, start_date: datetime):
     DB에서 주어진 날짜 이후의 가격 데이터를 불러온다.
     주말(토, 일)은 제외한다.
     """
-    query = select(daily_ticker).where(daily_ticker.date >= start_date)
+    query = select(DailyTicker).where(DailyTicker.date >= start_date)
     df = pd.read_sql(query, session.bind)
     df['date'] = pd.to_datetime(df['date'])
     df = df[df['date'].dt.weekday < 5]  # 주말 제외
@@ -70,7 +72,16 @@ def run_rebalancing(session: Session, start_year: int, start_month: int, initial
         start_date += timedelta(days=30)  # 매월 진행
 
     stats = calculate_statistics(nav_history)
+    print({
+        'final_nav': nav,
+        'statistics': stats
+    })
     return {
         'final_nav': nav,
         'statistics': stats
     }
+
+
+if __name__ == "__main__":
+    session: Session = SessionLocal()
+    run_rebalancing(session, 2021, 1, 1000000, 1, 0.001, 6)
