@@ -5,7 +5,7 @@ from stocks.core.database import DATABASE_URL
 
 engine = create_engine(DATABASE_URL)
 
-df = pd.read_csv("/Users/jangjiwan/Downloads/백엔드 과제 - 가격.csv")
+df = pd.read_csv("/Users/jangjiwan/Downloads/제목 없는 스프레드시트 - 시트1.csv")
 
 df_melted = df.melt(id_vars=["date"], var_name="ticker", value_name="price")
 
@@ -14,3 +14,4 @@ print(df_melted.head())
 
 # PostgreSQL에 저장
 df_melted.to_sql("daily_ticker", engine, if_exists="append", index=False)
+

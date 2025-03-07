@@ -1,9 +1,11 @@
+from decimal import Decimal
+
 from sqlalchemy.orm import Session
 
 from stocks.core.database import SessionLocal
-from stocks.services.rebalancing import run_rebalancing
+from stocks.services.rebalancing import rebalancing_service
 
 if __name__ == "__main__":
     session: Session = SessionLocal()
 
-    run_rebalancing(session, 2021, 1, 1000000, 1, 0.001, 6)
+    rebalancing_service.run_rebalancing(session, 2020, 1, 1000, 15, Decimal(0.001), 3)
