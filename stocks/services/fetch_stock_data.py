@@ -2,8 +2,7 @@ import requests
 import datetime
 
 YAHOO_URL = "https://query1.finance.yahoo.com/v7/finance/download/"
-STOCKS = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
-
+STOCKS = ["SPY", "QQQ", "GLD", "TIP"]
 
 def fetch_stock_price(ticker: str) -> (str, float):
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range=1d"
