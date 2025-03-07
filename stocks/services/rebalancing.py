@@ -1,5 +1,5 @@
+import math
 from datetime import datetime, timedelta
-from decimal import Decimal
 from typing import Dict
 
 import pandas as pd
@@ -24,57 +24,54 @@ def fetch_stock_data(session: Session, start_date: datetime):
 
 
 def calculate_rebalancing_weights(
-    ticker_info: dict[str, TickerInfo], df: pd.DataFrame, start_date: pd.Timestamp, period_months: int, top_n: int = 2
+    ticker_info: dict[str, TickerInfo],
+    df: pd.DataFrame,
+    start_date: pd.Timestamp,
+    period_months: int,
+    top_n: int = 2,
 ):
+    df_tip = df.query("ticker == 'TIP'")
+
+    # 날짜 필터링 (최근 3개월)
+    tip_cutoff_date = start_date - pd.DateOffset(months=3)
+    tip_df_filtered = df_tip[df_tip["date"].between(tip_cutoff_date, start_date)]
+
+    tip_profit = 1 - tip_df_filtered.iloc[0].price / tip_df_filtered.iloc[-1].price
+
     cutoff_date = start_date - pd.DateOffset(months=period_months)
     df_filtered = df[df["date"].between(cutoff_date, start_date)]
 
-
     for ticker, ticker_data in df_filtered.groupby("ticker"):
         ticker_info[ticker].momentum = calculate_momentum(ticker_data)
-        ticker_info[ticker].profit_rate = round(ticker_data.iloc[-1].price / ticker_info[ticker].current_price, 9) if ticker_info[ticker].current_price != 0 else 0
+        ticker_info[ticker].profit_rate = (
+            round(ticker_data.iloc[-1].price / ticker_info[ticker].current_price, 5)
+            if ticker_info[ticker].current_price != 0
+            else 0
+        )
         ticker_info[ticker].current_price = ticker_data.iloc[-1].price
-        print(ticker_info[ticker].momentum, ticker_info[ticker].current_price, ticker_info[ticker].profit_rate, ticker)
 
-    buy_bil = True if ticker_info["TIP"].momentum < 0 else False
+    for ticker, info in ticker_info.items():
+        info.weight = 0
 
+    buy_bil = True if tip_profit < 0 else False
     if buy_bil:
-        ticker_info["BIL"].weight = 1
+        for ticker, info in ticker_info.items():
+            if ticker == "BIL":
+                info.weight = 1
         return
 
-    # top_n개의 ticker를 선택해서 weight를 0.5로 설정
-    sorted_tickers = sorted(ticker_info.items(), key=lambda x: x[1].momentum, reverse=True)
-    for i, (ticker, info) in enumerate(sorted_tickers[:top_n]):
-        info.weight = 0.5
+    # BIL과 TIP을 제외한 종목만 필터링
+    filtered_tickers = {k: v for k, v in ticker_info.items() if k not in {"BIL", "TIP"}}
 
-from decimal import Decimal, ROUND_DOWN
+    # 모멘텀 기준으로 정렬
+    sorted_tickers = sorted(
+        filtered_tickers.items(), key=lambda x: x[1].momentum, reverse=True
+    )
 
-def execute_trades(
-    ticker_info: Dict[str, TickerInfo],
-    account_status: AccountStatus,
-    trading_fee: float,
-):
-    """
-    리밸런싱 후 NAV를 계산한다.
-    """
-    rounding = Decimal("0.01")  # 소숫점 2자리까지 제한
-
-    total_nav = account_status.current_nav
-    for stock_code, info in ticker_info.items():
-        # TODO 구매 후 남은 잔액은 어떻게 할까?
-        print(info.after_nav, "info.after_nav")
-        info.before_nav = info.after_nav * Decimal(1 + info.profit_rate)
-        print(info.before_nav, "info.before_nav")
-        purchase_amount = (total_nav * Decimal(info.weight)).quantize(rounding, rounding=ROUND_DOWN)
-        purchase_amount = (purchase_amount - info.before_nav).quantize(rounding, rounding=ROUND_DOWN)
-        print(purchase_amount, stock_code, "purchase_amount", Decimal(1 - trading_fee))
-
-        info.target_nav = purchase_amount
-        info.after_nav = (purchase_amount * Decimal(1 - trading_fee)).quantize(rounding, rounding=ROUND_DOWN)
-        info.fee = purchase_amount * Decimal(trading_fee).quantize(rounding, rounding=ROUND_DOWN)
-        print(purchase_amount, stock_code, "purchase_amount")
-
-    return account_status
+    # top_n개 선택 후 weight 설정
+    for i, (ticker, info) in enumerate(sorted_tickers):
+        if i < top_n:
+            info.weight = 0.5
 
 
 def calculate_statistics(nav_history: list):
@@ -110,6 +107,47 @@ class RebalancingService:
     def __init__(self):
         self.account_status = AccountStatus()
         self.ticker_info: dict[str, TickerInfo] = {}
+        self.total_nav = 0
+
+    def execute_trades(
+        self,
+        trading_fee: float,
+    ):
+        """
+        리밸런싱 후 NAV를 계산한다.
+        """
+
+        for stock_code, info in self.ticker_info.items():
+            info.before_nav = round(info.after_nav * info.profit_rate, 2)
+            self.total_nav += info.before_nav - info.target_nav
+
+        print(self.total_nav , "total_nav")
+        for stock_code, info in self.ticker_info.items():
+            # TODO 구매 후 남은 잔액은 어떻게 할까?
+            purchase_amount = round(self.total_nav * info.weight, 2)
+            print(info.before_nav)
+            purchase_amount = round(purchase_amount - info.before_nav, 2)
+
+            info.target_nav = purchase_amount + info.before_nav
+            info.after_nav = round(purchase_amount + info.before_nav, 2)
+            info.fee = round(abs(purchase_amount) * trading_fee, 2)
+            print(
+                purchase_amount,
+                stock_code,
+                "purchase_amount",
+                info.profit_rate,
+                info.after_nav,
+                info.target_nav,
+            )
+        total_fee = sum(
+            [info.fee for info in self.ticker_info.values()]
+        )
+
+        for stock_code, info in self.ticker_info.items():
+            info.after_nav = round(info.after_nav - round(total_fee * info.weight, 2), 2)
+            print(info.after_nav, "after_nav")
+
+        self.account_status.current_nav = self.total_nav - total_fee
 
     def run_rebalancing(
         self,
@@ -118,7 +156,7 @@ class RebalancingService:
         start_month: int,
         initial_nav: float,
         trading_day: int,
-        trading_fee: Decimal,
+        trading_fee: float,
         rebalance_month_period: int,
         trading_month_period: int = 1,
     ) -> dict:
@@ -129,40 +167,40 @@ class RebalancingService:
         stock_data = fetch_stock_data(session, start_date - timedelta(days=200))
         nav_history = [initial_nav]
 
-        self.account_status.initial_nav = Decimal(initial_nav)
-        self.account_status.current_nav = Decimal(initial_nav)
+        self.account_status.initial_nav = initial_nav
+        self.total_nav = initial_nav
+        self.account_status.current_nav = initial_nav
+
         self.ticker_info = {
-            ticker: TickerInfo()
-            for ticker in stock_data["ticker"].unique()
+            ticker: TickerInfo() for ticker in stock_data["ticker"].unique()
         }
         cnt = 0
         while True:
+            print("\nstart_date", start_date)
             calculate_rebalancing_weights(
                 self.ticker_info, stock_data, start_date, rebalance_month_period
             )
-            print(self.ticker_info["SPY"].weight, self.ticker_info["QQQ"].weight, self.ticker_info["GLD"].weight, self.ticker_info["BIL"].weight, "weight")
-
-            execute_trades(
-                self.ticker_info, self.account_status, trading_fee
-            )
             print(
-                self.account_status.current_nav,
+                self.ticker_info["SPY"].weight,
+                self.ticker_info["QQQ"].weight,
+                self.ticker_info["GLD"].weight,
+                self.ticker_info["BIL"].weight,
+                "weight",
             )
+
+            self.execute_trades(trading_fee)
+
             nav_history.append(self.account_status.current_nav)
             before_date = start_date
             start_date = get_next_trading_date(
                 stock_data, start_date, trading_day, trading_month_period
             )
-            cnt += 1
-            if cnt > 2:
-                break
             if start_date == before_date:
                 break
 
         stats = calculate_statistics(nav_history)
-        print(nav_history)
-        print({"final_nav": account_status.current_nav, "statistics": stats})
-        return {"final_nav": account_status.current_nav, "statistics": stats}
+        print({"final_nav": self.account_status.current_nav, "statistics": stats})
+        return {"final_nav": self.account_status.current_nav, "statistics": stats}
 
 
 def calculate_momentum(stock_prices: pd.DataFrame):
