@@ -5,7 +5,7 @@ from sqlalchemy import pool
 
 from alembic import context
 from stocks.core.database import DATABASE_URL
-from stocks.core.database import Base
+from stocks.models import Base
 
 
 config = context.config

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from stocks.core.database import get_db
 from stocks.schemas.daily_ticker import DailyTickerCreate, DailyTickerResponse
-from stocks.services.daily_ticker import create_daily_ticker, get_all_daily_tickers
+from stocks.services.fetch_stock_data import create_daily_ticker, get_all_daily_tickers
 
 router = APIRouter()
 

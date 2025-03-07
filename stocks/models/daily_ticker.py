@@ -1,17 +1,9 @@
-from sqlalchemy import Column, Integer, String, Numeric, Date
-
-from stocks.core.database import Base
-
-"""
-date	Date	2020-01-01
-ticker	Varchar(10)	SPY
-price	Numeric(13,4)	298.2208
-"""
+from sqlalchemy import Column, String, Numeric, Date, Integer
+from stocks.models.base import Base
 
 class DailyTicker(Base):
     __tablename__ = "daily_ticker"
 
-    id = Column(Integer, primary_key=True, index=True)
-    date = Column(Date, primary_key=True, index=True, nullable=False)
-    ticker = Column(String(10), index=True, nullable=False)
+    date = Column(Date, primary_key=True, nullable=False, index=True)
+    ticker = Column(String(10), primary_key=True, nullable=False, index=True)
     price = Column(Numeric(13, 4), nullable=False)
