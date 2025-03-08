@@ -2,6 +2,7 @@ import math
 from datetime import datetime, timedelta
 from typing import Dict
 
+import numpy as np
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from sqlalchemy.orm import Session
@@ -74,19 +75,47 @@ def calculate_rebalancing_weights(
             info.weight = 0.5
 
 
-def calculate_statistics(nav_history: list):
+def calculate_statistics(nav_history, trade_day, yearly_trade_day: int = 12) -> Dict:
     """
-    NAV 변동을 기반으로 누적 수익률, 연평균 수익률, 변동성을 계산한다.
+    투자 성과 지표를 계산하는 함수
+
+    Parameters:
+        nav_history (list): 순자산 가치(NAV) 리스트
+        trade_day (int): 거래일 수
+        yearly_trade_day (int): 1년 거래일 수
+
+    Returns:
+        dict: 전체 기간 수익률, 연환산수익율, 연 변동성, 샤프지수, 최대 손실폭
     """
-    df = pd.DataFrame({"NAV": nav_history})
-    df["returns"] = df["NAV"].pct_change()
-    cumulative_return = (df["NAV"].iloc[-1] / df["NAV"].iloc[0]) - 1
-    annualized_return = (1 + cumulative_return) ** (1 / (len(df) / 12)) - 1
-    volatility = df["returns"].std()
+    nav = np.array(nav_history)
+
+    # 전체 기간 수익률
+    total_return = (nav[-1] / nav[0] - 1) * 100
+
+    # 연환산 수익률 (CAGR)
+    num_years = trade_day / 365
+    cagr = ((nav[-1] / nav[0]) ** (1 / num_years) - 1) * 100
+
+    # 일간 수익률
+    daily_returns = np.diff(nav) / nav[:-1]
+
+    # 연변동성 (Annualized Volatility)
+    annualized_volatility = np.std(daily_returns) * np.sqrt(yearly_trade_day) * 100
+
+    # 샤프 지수 (Sharpe Ratio) - 무위험 수익률 고려
+    sharpe_ratio = (cagr - 0) / annualized_volatility if annualized_volatility > 0 else np.nan
+
+    # 최대 손실폭 (Max Drawdown)
+    running_max = np.maximum.accumulate(nav)
+    drawdowns = (nav - running_max) / running_max
+    max_drawdown = np.min(drawdowns) * 100
+
     return {
-        "cumulative_return": cumulative_return,
-        "annualized_return": annualized_return,
-        "volatility": volatility,
+        "total_return": total_return,
+        "cagr": cagr,
+        "vol": annualized_volatility,
+        "sharpe": sharpe_ratio,
+        "mdd": max_drawdown,
     }
 
 
@@ -121,31 +150,20 @@ class RebalancingService:
             info.before_nav = round(info.after_nav * info.profit_rate, 2)
             self.total_nav += info.before_nav - info.target_nav
 
-        print(self.total_nav , "total_nav")
         for stock_code, info in self.ticker_info.items():
             # TODO 구매 후 남은 잔액은 어떻게 할까?
             purchase_amount = round(self.total_nav * info.weight, 2)
-            print(info.before_nav)
             purchase_amount = round(purchase_amount - info.before_nav, 2)
 
             info.target_nav = purchase_amount + info.before_nav
             info.after_nav = round(purchase_amount + info.before_nav, 2)
             info.fee = round(abs(purchase_amount) * trading_fee, 2)
-            print(
-                purchase_amount,
-                stock_code,
-                "purchase_amount",
-                info.profit_rate,
-                info.after_nav,
-                info.target_nav,
-            )
         total_fee = sum(
             [info.fee for info in self.ticker_info.values()]
         )
 
         for stock_code, info in self.ticker_info.items():
             info.after_nav = round(info.after_nav - round(total_fee * info.weight, 2), 2)
-            print(info.after_nav, "after_nav")
 
         self.account_status.current_nav = self.total_nav - total_fee
 
@@ -159,9 +177,23 @@ class RebalancingService:
         trading_fee: float,
         rebalance_month_period: int,
         trading_month_period: int = 1,
-    ) -> dict:
+    ) -> (dict, dict):
         """
         리밸런싱 프로세스를 실행하는 메인 함수
+
+        Parameters:
+            session (Session): DB 세션
+            start_year (int): 시작 연도
+            start_month (int): 시작 월
+            initial_nav (float): 초기 자산가치
+            trading_day (int): 거래일
+            trading_fee (float): 거래 수수료
+            rebalance_month_period (int): 리밸런싱 주기 (월)
+            trading_month_period (int): 거래 주기 (월)
+
+        Returns:
+            최종 리밸런싱 비중 rebalance_weight   ||
+            투자 성과 지표 stats
         """
         start_date = datetime(start_year, start_month, trading_day)
         stock_data = fetch_stock_data(session, start_date - timedelta(days=200))
@@ -174,7 +206,6 @@ class RebalancingService:
         self.ticker_info = {
             ticker: TickerInfo() for ticker in stock_data["ticker"].unique()
         }
-        cnt = 0
         while True:
             print("\nstart_date", start_date)
             calculate_rebalancing_weights(
@@ -197,10 +228,13 @@ class RebalancingService:
             )
             if start_date == before_date:
                 break
-
-        stats = calculate_statistics(nav_history)
-        print({"final_nav": self.account_status.current_nav, "statistics": stats})
-        return {"final_nav": self.account_status.current_nav, "statistics": stats}
+        stats = calculate_statistics(nav_history, (start_date - datetime(start_year, start_month, trading_day)).days)
+        last_rebalance_weight = {
+            ticker: info.weight for ticker, info in self.ticker_info.items()
+        }
+        print(stats)
+        print(last_rebalance_weight)
+        return last_rebalance_weight, stats
 
 
 def calculate_momentum(stock_prices: pd.DataFrame):

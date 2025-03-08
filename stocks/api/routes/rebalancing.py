@@ -1,8 +1,13 @@
+import traceback
+
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from stocks.core.database import SessionLocal, engine
 from stocks.infra.crud import create_rebalance_entry, get_rebalance_list, get_rebalance_entry, delete_rebalance_entry
 from stocks.models import Base
+from stocks.models.rebalancing import RebalanceData
+from stocks.services.rebalancing import rebalancing_service
 
 Base.metadata.create_all(bind=engine)
 
@@ -16,20 +21,63 @@ def get_db():
     finally:
         db.close()
 
+class RebalanceInput(BaseModel):
+    start_year: int
+    start_month: int
+    initial_nav: float
+    trading_day: int
+    trading_fee: float
+    rebalance_month_period: int
 
+
+class RebalanceOutput(BaseModel):
+    data_id: int
+    output: dict
+    last_rebalance_weight: list
+
+
+# API Endpoint
 @router.post("/rebalance/")
-def create_entry(input_data: dict, db: Session = Depends(get_db)):
-    # 가상의 계산 로직 적용
-    last_rebalance_weight = [("SPY", 0.5), ("QQQ", 0.5), ("BIL", 0)]
-    nav_totals = [100, 110, 120]
+def process_rebalance(data: RebalanceInput):
+    """
+    리밸런싱 API
+    """
+    session = SessionLocal()
+    try:
+        # Run trading strategy (dummy implementation)
+        last_rebalance_weight, stats = rebalancing_service.run_rebalancing(
+            session,
+            data.start_year,
+            data.start_month,
+            data.initial_nav,
+            data.trading_day,
+            data.trading_fee,
+            data.rebalance_month_period,
+        )
 
-    entry = create_rebalance_entry(db, input_data, last_rebalance_weight, nav_totals)
-    return {
-        "data_id": entry.data_id,
-        "output": {"total_return": 0.66, "cagr": 0.1043, "vol": 0.121, "sharpe": 0.86, "mdd": -0.1947},
-        "last_rebalance_weight": last_rebalance_weight
-    }
+        # Save to DB
+        investment = RebalanceData(
+            start_year=data.start_year,
+            start_month=data.start_month,
+            initial_capital=data.initial_capital,
+            trade_days=[str(d) for d in data.trade_days],
+            fee_rate=data.fee_rate,
+            rebalance_months=data.rebalance_months,
+            rebalance_weights=last_rebalance_weight,
+        )
+        session.add(investment)
+        session.commit()
+        session.refresh(investment)
 
+        return RebalanceOutput(data_id=investment.id, output=statistics, last_rebalance_weight=last_rebalance_weight)
+
+    except Exception as e:
+        session.rollback()
+        logging.error(f"/rebalance/: {traceback.format_exc()}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        session.close()
 
 @router.get("/rebalance/")
 def list_entries(db: Session = Depends(get_db)):

@@ -29,26 +29,28 @@ def fetch_stock_price(ticker: str, range: int = 1) -> (str, float):
 
 
 def fetch_adjusted_close_price(ticker: str) -> (str, float):
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range=1d"
+    date = datetime.datetime.strptime("2025-02-14", "%Y-%m-%d")
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range=1mo"
     headers = {"User-Agent": "Mozilla/5.0"}
 
     response = requests.get(url, headers=headers)
 
     if response.status_code == 200:
-        data_list = response.json()
+        data = response.json()
         print(data)
-        for data in data_list:
-            chart = data.get("chart", {}).get("result", [])[0]
-            timestamp = chart.get("timestamp", [])[0]
+        chart = data.get("chart", {}).get("result", [])[0]
+        timestamps = chart.get("timestamp", [])
+        indicators = chart.get("indicators", {})
 
-            # "adjclose" 데이터가 있으면 가져오고, 없으면 기본 "close" 사용
-            indicators = chart.get("indicators", {})
-            adj_close_price = indicators.get("adjclose", [{}])[0].get("adjclose", [None])[0]
-            close_price = indicators.get("quote", [{}])[0].get("close", [None])[0]
+        adj_closes = indicators.get("adjclose", [{}])[0].get("adjclose", [])
+        closes = indicators.get("quote", [{}])[0].get("close", [])
 
-            adjusted_price = adj_close_price if adj_close_price is not None else close_price
-            date = datetime.datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
+        for i, ts in enumerate(timestamps):
+            dt = datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
+            print(dt, date)
+            if dt == "2025-02-14":
+                adjusted_price = adj_closes[i] if adj_closes[i] is not None else closes[i]
+                return dt, adjusted_price
 
-        return date, adjusted_price
     else:
         raise Exception(f"Failed to fetch data: {response.status_code}")
