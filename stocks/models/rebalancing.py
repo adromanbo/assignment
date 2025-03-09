@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, Numeric, Date, Integer, JSON
 from stocks.models.base import Base
 
 
-class RebalanceData(Base):
+class RebalancingData(Base):
     __tablename__ = "rebalance_data"
 
     data_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
