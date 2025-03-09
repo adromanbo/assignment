@@ -2,36 +2,25 @@ import logging
 import traceback
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from stocks.core.database import SessionLocal, engine, get_db
 from stocks.infra.database.rebalancing import rebalancing_repo
 from stocks.models import Base
 from stocks.models.rebalancing import RebalancingData
+from stocks.schemas.rebalancing import *
+from stocks.schemas.standard import StandardResponse
 from stocks.services.rebalancing import rebalancing_service
+from stocks.services.response_deco import standardize_response
 
 Base.metadata.create_all(bind=engine)
 
 router = APIRouter()
 
-class RebalanceInput(BaseModel):
-    start_year: int
-    start_month: int
-    initial_nav: float
-    trading_day: int
-    trading_fee: float
-    rebalance_month_period: int
-
-
-class RebalanceOutput(BaseModel):
-    data_id: int
-    output: dict
-    last_rebalance_weight: list
-
 
 # API Endpoint
-@router.post("/rebalance/process")
-def process_rebalance(data: RebalanceInput) -> RebalanceOutput:
+@router.post("/process", response_model=StandardResponse[RebalanceProcessOutput])
+@standardize_response
+def process_rebalance(data: RebalanceInput):
     """
     리밸런싱 API
     {
@@ -67,7 +56,11 @@ def process_rebalance(data: RebalanceInput) -> RebalanceOutput:
         session.commit()
         session.refresh(investment)
 
-        return RebalanceOutput(data_id=investment.data_id, output=stats, last_rebalance_weight=last_rebalance_weight)
+        return RebalanceProcessOutput(
+            data_id=investment.data_id,
+            output=stats,
+            last_rebalance_weight=last_rebalance_weight,
+        )
 
     except Exception as e:
         session.rollback()
@@ -77,10 +70,9 @@ def process_rebalance(data: RebalanceInput) -> RebalanceOutput:
     finally:
         session.close()
 
-class GetRebalanceAllDataOutput(BaseModel):
-    data_list: list
 
-@router.get("/all")
+@router.get("/fetch/all")
+@standardize_response
 def get_rebalancing_all_data(db: Session = Depends(get_db)):
     limit = 2000
     entries = rebalancing_repo.fetch_all(db, limit)
@@ -88,22 +80,24 @@ def get_rebalancing_all_data(db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Too many entries")
     return GetRebalanceAllDataOutput(data_list=entries)
 
-class GetRebalanceDataOutput(BaseModel):
-    input: dict
-    output: dict
-    last_rebalance_weight: list
 
-@router.get("/{data_id}")
-def get_rebalancing_data(data_id: int, db: Session = Depends(get_db)) -> GetRebalanceDataOutput:
+@router.get("/fetch/{data_id}")
+@standardize_response
+def get_rebalancing_data(
+    data_id: int, db: Session = Depends(get_db)
+) -> GetRebalanceDataOutput:
     entry = rebalancing_repo.fetch_by_data_id(db, data_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Data not found")
-    return GetRebalanceDataOutput(input=entry.input_data, output=entry.output_data, last_rebalance_weight=entry.rebalance_weights)
+    return GetRebalanceDataOutput(
+        input=entry.input_data,
+        output=entry.output_data,
+        last_rebalance_weight=entry.rebalance_weights,
+    )
 
-class DeleteRebalanceDataOutput(BaseModel):
-    data_id: int
 
-@router.delete("/{data_id}")
+@router.delete("/fetch/{data_id}")
+@standardize_response
 def delete_entry(data_id: int, db: Session = Depends(get_db)):
     entry = rebalancing_repo.delete_by_data_id(db, data_id)
     if not entry:
