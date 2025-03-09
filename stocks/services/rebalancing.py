@@ -204,16 +204,8 @@ class RebalancingService:
             ticker: TickerInfo() for ticker in stock_data["ticker"].unique()
         }
         while True:
-            print("\nstart_date", start_date)
             self.calculate_rebalancing_weights(
                 stock_data, start_date, rebalance_month_period
-            )
-            print(
-                self.ticker_info["SPY"].weight,
-                self.ticker_info["QQQ"].weight,
-                self.ticker_info["GLD"].weight,
-                self.ticker_info["BIL"].weight,
-                "weight",
             )
 
             self.execute_trades(trading_fee)
@@ -233,8 +225,6 @@ class RebalancingService:
             nav_history,
             (start_date - datetime(start_year, start_month, trading_day)).days,
         )
-        print(stats)
-        print(rebalance_weight_list)
         return rebalance_weight_list, stats, nav_history
 
 
