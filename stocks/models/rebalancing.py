@@ -11,6 +11,7 @@ class RebalancingData(Base):
     rebalance_weight_list = Column(JSON, nullable=False)
     nav_history = Column(JSON, nullable=False)
 
+
 def serialize_rebalancing_data(value):
     if isinstance(value, list):
         return [serialize_rebalancing_data(value) for value in value]

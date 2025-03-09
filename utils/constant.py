@@ -1,5 +1,3 @@
-
-
 class PurchaseListObject:
     stock_code: str
     purchase_amount: float

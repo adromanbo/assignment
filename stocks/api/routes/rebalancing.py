@@ -8,9 +8,7 @@ from stocks.infra.database.rebalancing import rebalancing_repo
 from stocks.models import Base
 from stocks.models.rebalancing import RebalancingData, serialize_rebalancing_data
 from stocks.schemas.rebalancing import *
-from stocks.schemas.standard import StandardResponse
 from stocks.services.rebalancing import rebalancing_service
-from stocks.services.response_deco import standardize_response
 
 Base.metadata.create_all(bind=engine)
 
@@ -77,9 +75,7 @@ def get_rebalancing_all_data(db: Session = Depends(get_db)):
 
 
 @router.get("/fetch/{data_id}")
-def get_rebalancing_data(
-    data_id: int, db: Session = Depends(get_db)
-):
+def get_rebalancing_data(data_id: int, db: Session = Depends(get_db)):
     entry = rebalancing_repo.fetch_by_data_id(db, data_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Data not found")

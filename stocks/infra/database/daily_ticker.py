@@ -19,4 +19,5 @@ class DailyTickerRepo:
         df["date"] = pd.to_datetime(df["date"])
         return df
 
+
 daily_ticker_repo = DailyTickerRepo()

@@ -14,4 +14,3 @@ print(df_melted.head())
 
 # PostgreSQL에 저장
 df_melted.to_sql("daily_ticker", engine, if_exists="append", index=False)
-

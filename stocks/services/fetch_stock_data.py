@@ -49,7 +49,9 @@ def fetch_adjusted_close_price(ticker: str) -> (str, float):
             dt = datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
             print(dt, date)
             if dt == "2025-02-14":
-                adjusted_price = adj_closes[i] if adj_closes[i] is not None else closes[i]
+                adjusted_price = (
+                    adj_closes[i] if adj_closes[i] is not None else closes[i]
+                )
                 return dt, adjusted_price
 
     else:

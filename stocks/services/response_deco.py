@@ -12,6 +12,7 @@ import inspect
 app = FastAPI()
 router = APIRouter()
 
+
 def standardize_response(func: Callable) -> Callable:
     if inspect.iscoroutinefunction(func):
         # 비동기 함수인 경우
@@ -24,9 +25,14 @@ def standardize_response(func: Callable) -> Callable:
                 print(traceback.format_exc())
 
                 return JSONResponse(
-                    content={"status": "error", "data": None, "error": {"message": str(e)}},
-                    status_code=500
+                    content={
+                        "status": "error",
+                        "data": None,
+                        "error": {"message": str(e)},
+                    },
+                    status_code=500,
                 )
+
         return async_wrapper
     else:
         # 동기 함수인 경우
@@ -38,7 +44,12 @@ def standardize_response(func: Callable) -> Callable:
             except Exception as e:
                 print(traceback.format_exc())
                 return JSONResponse(
-                    content={"status": "error", "data": None, "error": {"message": str(e)}},
-                    status_code=500
+                    content={
+                        "status": "error",
+                        "data": None,
+                        "error": {"message": str(e)},
+                    },
+                    status_code=500,
                 )
+
         return sync_wrapper

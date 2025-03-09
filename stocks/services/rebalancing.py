@@ -190,7 +190,9 @@ class RebalancingService:
             투자 성과 지표 stats
         """
         start_date = datetime(start_year, start_month, trading_day)
-        stock_data = daily_ticker_repo.fetch_ticker_data(session, start_date - timedelta(days=200))
+        stock_data = daily_ticker_repo.fetch_ticker_data(
+            session, start_date - timedelta(days=200)
+        )
         nav_history = [initial_nav]
         rebalance_weight_list = []
 
