@@ -19,7 +19,6 @@ router = APIRouter()
 
 # API Endpoint
 @router.post("/process")
-@standardize_response
 def process_rebalance(data: RebalanceInput):
     """
     리밸런싱 API
@@ -69,7 +68,6 @@ def process_rebalance(data: RebalanceInput):
 
 
 @router.get("/fetch/all")
-@standardize_response
 def get_rebalancing_all_data(db: Session = Depends(get_db)):
     limit = 200
     entries = serialize_rebalancing_data(rebalancing_repo.fetch_all(db, limit))
@@ -79,7 +77,6 @@ def get_rebalancing_all_data(db: Session = Depends(get_db)):
 
 
 @router.get("/fetch/{data_id}")
-@standardize_response
 def get_rebalancing_data(
     data_id: int, db: Session = Depends(get_db)
 ):
@@ -94,7 +91,6 @@ def get_rebalancing_data(
 
 
 @router.delete("/fetch/{data_id}")
-@standardize_response
 def delete_entry(data_id: int, db: Session = Depends(get_db)):
     entry = rebalancing_repo.delete_by_data_id(db, data_id)
     if not entry:
