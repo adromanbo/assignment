@@ -139,25 +139,37 @@ class RebalancingService:
         """
         리밸런싱 후 NAV를 계산한다.
         """
-
         for stock_code, info in self.ticker_info.items():
             info.before_nav = round(info.after_nav * info.profit_rate, 2)
             self.total_nav += info.before_nav - info.target_nav
 
+        sell_amount = 0
         for stock_code, info in self.ticker_info.items():
             # TODO 구매 후 남은 잔액은 어떻게 할까?
-            purchase_amount = round(self.total_nav * info.weight, 2)
-            purchase_amount = round(purchase_amount - info.before_nav, 2)
+            purchase_amount = round(self.total_nav * info.weight - info.before_nav, 2)
+            if purchase_amount < 0:
+                sell_amount += purchase_amount
+                info.target_nav = round(purchase_amount + info.before_nav, 2)
+                info.fee = round(abs(purchase_amount) * trading_fee, 2)
+                info.after_nav = round(purchase_amount + info.before_nav - info.fee, 2)
+                info.before_weight = info.weight
+                info.actioned = True
+                self.total_nav -= info.fee
+                print(purchase_amount, stock_code, "sell")
+            else:
+                info.actioned = False
 
-            info.target_nav = purchase_amount + info.before_nav
-            info.after_nav = round(purchase_amount + info.before_nav, 2)
-            info.fee = round(abs(purchase_amount) * trading_fee, 2)
-        total_fee = sum([info.fee for info in self.ticker_info.values()])
-
+        # TODO 예제 목표 NAV가 수수료를 고려하지 않고 계산되어 있음
         for stock_code, info in self.ticker_info.items():
-            info.after_nav = round(
-                info.after_nav - round(total_fee * info.weight, 2), 2
-            )
+            if not info.actioned:
+                purchase_amount = round(self.total_nav * info.weight - info.before_nav, 2)
+                print(purchase_amount, stock_code, "buy")
+                info.target_nav = purchase_amount + info.before_nav
+                info.fee = round(abs(purchase_amount) * trading_fee, 2)
+                info.after_nav = round(purchase_amount + info.before_nav - info.fee, 2)
+                info.before_weight = info.weight
+
+        total_fee = sum([info.fee for info in self.ticker_info.values()])
 
         self.account_status.current_nav = self.total_nav - total_fee
 
@@ -203,6 +215,7 @@ class RebalancingService:
         self.ticker_info = {
             ticker: TickerInfo() for ticker in stock_data["ticker"].unique()
         }
+        cnt = 0
         while True:
             print("\nstart_date", start_date)
             self.calculate_rebalancing_weights(
@@ -235,7 +248,7 @@ class RebalancingService:
             )
             if start_date == before_date:
                 break
-
+            cnt += 1
         stats = self.calculate_statistics(
             nav_history,
             (start_date - datetime(start_year, start_month, trading_day)).days,

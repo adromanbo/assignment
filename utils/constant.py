@@ -11,7 +11,9 @@ class AccountStatus:
 
 class TickerInfo:
     weight: float = 0
+    before_weight: float = 0
     target_nav: float = 0
+    actioned: bool = False
     fee: float = 0
     before_nav: float = 0
     after_nav: float = 0
