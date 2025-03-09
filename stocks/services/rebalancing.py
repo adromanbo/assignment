@@ -171,7 +171,7 @@ class RebalancingService:
         trading_fee: float,
         rebalance_month_period: int,
         trading_month_period: int = 1,
-    ) -> (dict, dict):
+    ) -> (list, dict, list):
         """
         리밸런싱 프로세스를 실행하는 메인 함수
 
@@ -192,6 +192,7 @@ class RebalancingService:
         start_date = datetime(start_year, start_month, trading_day)
         stock_data = daily_ticker_repo.fetch_ticker_data(session, start_date - timedelta(days=200))
         nav_history = [initial_nav]
+        rebalance_weight_list = []
 
         self.account_status.initial_nav = initial_nav
         self.total_nav = initial_nav
@@ -220,6 +221,9 @@ class RebalancingService:
             start_date = self.get_next_trading_date(
                 stock_data, start_date, trading_day, trading_month_period
             )
+            rebalance_weight_list.append(
+                [(ticker, info.weight) for ticker, info in self.ticker_info.items()]
+            )
             if start_date == before_date:
                 break
 
@@ -227,12 +231,9 @@ class RebalancingService:
             nav_history,
             (start_date - datetime(start_year, start_month, trading_day)).days,
         )
-        last_rebalance_weight = {
-            ticker: info.weight for ticker, info in self.ticker_info.items()
-        }
         print(stats)
-        print(last_rebalance_weight)
-        return last_rebalance_weight, stats
+        print(rebalance_weight_list)
+        return rebalance_weight_list, stats, nav_history
 
 
 rebalancing_service = RebalancingService()

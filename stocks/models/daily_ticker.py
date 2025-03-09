@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Numeric, Date, Integer
+from sqlalchemy import Column, String, Numeric, Date
 from stocks.models.base import Base
 
 class DailyTicker(Base):

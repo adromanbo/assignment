@@ -1,3 +1,5 @@
+import traceback
+
 from fastapi import FastAPI, APIRouter
 from fastapi.responses import JSONResponse
 
@@ -19,6 +21,8 @@ def standardize_response(func: Callable) -> Callable:
                 result = await func(*args, **kwargs)
                 return StandardResponse(status="success", data=result, error=None)
             except Exception as e:
+                print(traceback.format_exc())
+
                 return JSONResponse(
                     content={"status": "error", "data": None, "error": {"message": str(e)}},
                     status_code=500
@@ -32,6 +36,7 @@ def standardize_response(func: Callable) -> Callable:
                 result = func(*args, **kwargs)
                 return StandardResponse(status="success", data=result, error=None)
             except Exception as e:
+                print(traceback.format_exc())
                 return JSONResponse(
                     content={"status": "error", "data": None, "error": {"message": str(e)}},
                     status_code=500

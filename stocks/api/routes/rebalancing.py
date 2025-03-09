@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from stocks.core.database import SessionLocal, engine, get_db
 from stocks.infra.database.rebalancing import rebalancing_repo
 from stocks.models import Base
-from stocks.models.rebalancing import RebalancingData
+from stocks.models.rebalancing import RebalancingData, serialize_rebalancing_data
 from stocks.schemas.rebalancing import *
 from stocks.schemas.standard import StandardResponse
 from stocks.services.rebalancing import rebalancing_service
@@ -18,7 +18,7 @@ router = APIRouter()
 
 
 # API Endpoint
-@router.post("/process", response_model=StandardResponse[RebalanceProcessOutput])
+@router.post("/process")
 @standardize_response
 def process_rebalance(data: RebalanceInput):
     """
@@ -32,7 +32,7 @@ def process_rebalance(data: RebalanceInput):
     session = SessionLocal()
     try:
         # Run trading strategy (dummy implementation)
-        last_rebalance_weight, stats = rebalancing_service.run_rebalancing(
+        rebalance_weight_list, stats, nav_history = rebalancing_service.run_rebalancing(
             session,
             data.start_year,
             data.start_month,
@@ -41,25 +41,22 @@ def process_rebalance(data: RebalanceInput):
             data.trading_fee,
             data.rebalance_month_period,
         )
-
+        print(data.dict())
         # Save to DB
         investment = RebalancingData(
-            start_year=data.start_year,
-            start_month=data.start_month,
-            initial_capital=data.initial_capital,
-            trade_days=[str(d) for d in data.trade_days],
-            fee_rate=data.fee_rate,
-            rebalance_months=data.rebalance_months,
-            rebalance_weights=last_rebalance_weight,
+            input_data=data.dict(),
+            output_data=stats,
+            rebalance_weight_list=rebalance_weight_list,
+            nav_history=nav_history,
         )
         session.add(investment)
         session.commit()
         session.refresh(investment)
-
+        print("Asdf")
         return RebalanceProcessOutput(
             data_id=investment.data_id,
             output=stats,
-            last_rebalance_weight=last_rebalance_weight,
+            last_rebalance_weight=rebalance_weight_list[-1],
         )
 
     except Exception as e:
@@ -74,8 +71,8 @@ def process_rebalance(data: RebalanceInput):
 @router.get("/fetch/all")
 @standardize_response
 def get_rebalancing_all_data(db: Session = Depends(get_db)):
-    limit = 2000
-    entries = rebalancing_repo.fetch_all(db, limit)
+    limit = 200
+    entries = serialize_rebalancing_data(rebalancing_repo.fetch_all(db, limit))
     if len(entries) == limit:
         raise HTTPException(status_code=400, detail="Too many entries")
     return GetRebalanceAllDataOutput(data_list=entries)
@@ -85,14 +82,14 @@ def get_rebalancing_all_data(db: Session = Depends(get_db)):
 @standardize_response
 def get_rebalancing_data(
     data_id: int, db: Session = Depends(get_db)
-) -> GetRebalanceDataOutput:
+):
     entry = rebalancing_repo.fetch_by_data_id(db, data_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Data not found")
     return GetRebalanceDataOutput(
         input=entry.input_data,
         output=entry.output_data,
-        last_rebalance_weight=entry.rebalance_weights,
+        last_rebalance_weight=entry.rebalance_weight_list[-1],
     )
 
 
