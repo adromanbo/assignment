@@ -29,7 +29,6 @@ def fetch_stock_price(ticker: str, range: int = 1) -> (str, float):
 
 
 def fetch_adjusted_close_price(ticker: str) -> (str, float):
-    date = datetime.datetime.strptime("2025-02-14", "%Y-%m-%d")
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range=1mo"
     headers = {"User-Agent": "Mozilla/5.0"}
 
@@ -37,7 +36,6 @@ def fetch_adjusted_close_price(ticker: str) -> (str, float):
 
     if response.status_code == 200:
         data = response.json()
-        print(data)
         chart = data.get("chart", {}).get("result", [])[0]
         timestamps = chart.get("timestamp", [])
         indicators = chart.get("indicators", {})
@@ -47,7 +45,6 @@ def fetch_adjusted_close_price(ticker: str) -> (str, float):
 
         for i, ts in enumerate(timestamps):
             dt = datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
-            print(dt, date)
             if dt == "2025-02-14":
                 adjusted_price = (
                     adj_closes[i] if adj_closes[i] is not None else closes[i]

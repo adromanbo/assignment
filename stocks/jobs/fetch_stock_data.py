@@ -9,7 +9,7 @@ from stocks.services.fetch_stock_data import (
 )
 
 
-def update_stock_prices():
+def update_stock_prices() -> None:
     db: Session = SessionLocal()
     for ticker in STOCKS:
         date, close = fetch_adjusted_close_price(ticker)

@@ -9,7 +9,7 @@ from stocks.models import DailyTicker
 
 class DailyTickerRepo:
     @staticmethod
-    def fetch_ticker_data(session: Session, start_date: datetime):
+    def fetch_ticker_data(session: Session, start_date: datetime) -> pd.DataFrame:
         """
         DB에서 주어진 날짜 이후의 가격 데이터를 불러온다.
         주말(토, 일)은 제외한다.

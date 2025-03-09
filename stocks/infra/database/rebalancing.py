@@ -9,13 +9,13 @@ from stocks.models.rebalancing import RebalancingData
 
 class RebalancingRepo:
     @staticmethod
-    def fetch_by_data_id(db: Session, data_id: int):
+    def fetch_by_data_id(db: Session, data_id: int) -> RebalancingData:
         return (
             db.query(RebalancingData).filter(RebalancingData.data_id == data_id).first()
         )
 
     @staticmethod
-    def delete_by_data_id(db: Session, data_id: int):
+    def delete_by_data_id(db: Session, data_id: int) -> RebalancingData:
         entry = (
             db.query(RebalancingData).filter(RebalancingData.data_id == data_id).first()
         )
@@ -25,7 +25,7 @@ class RebalancingRepo:
         return entry
 
     @staticmethod
-    def fetch_all(db: Session, limit: int = 2000):
+    def fetch_all(db: Session, limit: int = 2000) -> list:
         return db.query(RebalancingData).all()[:limit]
 
 

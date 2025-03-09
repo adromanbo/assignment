@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-def calculate_momentum(stock_prices: pd.DataFrame):
+def calculate_momentum(stock_prices: pd.DataFrame) -> float:
     """모멘텀 계산 (절대/상대 모멘텀 적용 가능)"""
     initial_price = stock_prices.iloc[0].price
     latest_price = stock_prices.iloc[-1].price

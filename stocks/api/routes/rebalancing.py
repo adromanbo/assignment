@@ -17,14 +17,22 @@ router = APIRouter()
 
 # API Endpoint
 @router.post("/process")
-def process_rebalance(data: RebalanceInput):
+def process_rebalance(data: RebalanceInput) -> RebalanceProcessOutput:
     """
     리밸런싱 API
-    {
-        "data_id": 1,
-        "output": { "total_return": 0.66,  "cagr": 0.1043, "vol": 0.121, "sharpe": 0.86, "mdd": -0.1947},
-        "last_rebalance_weight": [("SPY", 0.5), ("QQQ", 0.5), ... ("BIL", 0)]
-    }
+
+    params:
+    - start_year: int  투자 시작 연도
+    - start_month: int  투자 시작 월
+    - initial_nav: float  초기 자산가치
+    - trading_day: int  거래일
+    - trading_fee: float 거래 수수료
+    - rebalance_month_period: int  리밸런싱 참고 주기 (월)
+
+    returns:
+    - data_id: int
+    - output: dict
+    - last_rebalance_weight: list
     """
     session = SessionLocal()
     try:
@@ -66,7 +74,14 @@ def process_rebalance(data: RebalanceInput):
 
 
 @router.get("/fetch/all")
-def get_rebalancing_all_data(db: Session = Depends(get_db)):
+def get_rebalancing_all_data(db: Session = Depends(get_db)) -> GetRebalanceAllDataOutput:
+    """
+    모든 리밸런싱 데이터 조회 API
+    좀비 쿼리나 response가 너무 커질 수 있으므로 최대 200개의 데이터만 조회 가능
+    returns:
+    - data_list: list
+
+    """
     limit = 200
     entries = serialize_rebalancing_data(rebalancing_repo.fetch_all(db, limit))
     if len(entries) == limit:
@@ -75,7 +90,17 @@ def get_rebalancing_all_data(db: Session = Depends(get_db)):
 
 
 @router.get("/fetch/{data_id}")
-def get_rebalancing_data(data_id: int, db: Session = Depends(get_db)):
+def get_rebalancing_data(data_id: int, db: Session = Depends(get_db)) -> GetRebalanceDataOutput:
+    """
+    리밸런싱 데이터 조회 API
+    params:
+    - data_id: int
+
+    returns:
+    - input: dict
+    - output: dict
+    - last_rebalance_weight: list
+    """
     entry = rebalancing_repo.fetch_by_data_id(db, data_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Data not found")
@@ -87,7 +112,15 @@ def get_rebalancing_data(data_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/fetch/{data_id}")
-def delete_entry(data_id: int, db: Session = Depends(get_db)):
+def delete_entry(data_id: int, db: Session = Depends(get_db)) -> DeleteRebalanceDataOutput:
+    """
+    리밸런싱 데이터 삭제 API
+    params:
+    - data_id: int
+
+    returns:
+    - data_id: int
+    """
     entry = rebalancing_repo.delete_by_data_id(db, data_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Data not found")
